@@ -7,11 +7,15 @@ if (!JWT_SECRET) {
 }
 
 // Generate JWT
-export const generateToken = (
-  id: string,
-  email: string,
-  role: string
-) => {
+export const generateToken = ({
+  id,
+  email,
+  role,
+}: {
+  id: string;
+  email: string;
+  role: string;
+}) => {
   return jwt.sign(
     {
       id,
@@ -28,7 +32,11 @@ export const generateToken = (
 // Verify JWT
 export const verifyToken = (token: string) => {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET) as {
+      id: string;
+      email: string;
+      role: string;
+    };
   } catch {
     return null;
   }
