@@ -58,11 +58,10 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="sticky top-0 flex h-screen w-72 flex-col border-r border-slate-800 bg-slate-950">
-
+   <aside className="fixed left-0 top-0 h-screen w-64 bg-slate-900 text-white shadow-xl">
       {/* Logo */}
 
-      <div className="border-b border-slate-800 px-8 py-7">
+      <div className="border-b text-white border-slate-800 px-8 py-7">
 
         <div className="flex items-center gap-3">
 
@@ -88,7 +87,7 @@ export default function Sidebar() {
 
       {/* Menu */}
 
-      <div className="flex-1 px-4 py-6">
+      <div className="flex-1 text-white px-4 py-6">
 
         <p className="mb-4 px-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
           Navigation
