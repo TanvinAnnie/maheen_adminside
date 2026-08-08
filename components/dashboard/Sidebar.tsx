@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { FC } from "react";
+import type { LucideProps } from "lucide-react";
 import {
   LayoutDashboard,
+  Image,
+  BriefcaseBusiness,
   Package,
   FolderTree,
   ShoppingCart,
   Settings,
   LogOut,
-  Image,
-  type LucideProps,
 } from "lucide-react";
 
 type IconComponent = FC<LucideProps>;
@@ -26,6 +27,11 @@ const menus: { title: string; href: string; icon: IconComponent }[] = [
   title: "Hero",
   href: "/dashboard/hero",
   icon: Image,
+},
+{
+  title: "Services",
+  href: "/dashboard/services",
+  icon: BriefcaseBusiness,
 },
   {
     title: "Products",
