@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import type { FC } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -9,14 +10,23 @@ import {
   ShoppingCart,
   Settings,
   LogOut,
+  Image,
+  type LucideProps,
 } from "lucide-react";
 
-const menus = [
+type IconComponent = FC<LucideProps>;
+
+const menus: { title: string; href: string; icon: IconComponent }[] = [
   {
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
+  {
+  title: "Hero",
+  href: "/dashboard/hero",
+  icon: Image,
+},
   {
     title: "Products",
     href: "/products",

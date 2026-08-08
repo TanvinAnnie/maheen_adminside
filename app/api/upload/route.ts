@@ -1,85 +1,128 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import cloudinary from "@/lib/cloudinary";
-import { UploadApiResponse } from "cloudinary";
 
-export async function POST(req: NextRequest) {
+export const runtime = "nodejs";
+
+export async function POST(request: NextRequest) {
   try {
-    console.log("===== Upload Started =====");
+    /* =====================================================
+       GET FORM DATA
+    ===================================================== */
 
-    const formData = await req.formData();
+    const formData = await request.formData();
 
-    const file = formData.get("file") as File | null;
+    const file = formData.get("file");
 
-    if (!file) {
+    /* =====================================================
+       CHECK FILE
+    ===================================================== */
+
+    if (!file || !(file instanceof File)) {
       return NextResponse.json(
         {
           success: false,
-          message: "No file uploaded.",
+          message: "No image file provided",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    console.log("Selected File:", file.name);
+    /* =====================================================
+       CHECK FILE TYPE
+    ===================================================== */
+
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Only image files are allowed",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* =====================================================
+       CHECK FILE SIZE
+       Maximum: 5MB
+    ===================================================== */
+
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Image size must be less than 5MB",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* =====================================================
+       CONVERT FILE TO BUFFER
+    ===================================================== */
 
     const bytes = await file.arrayBuffer();
+
     const buffer = Buffer.from(bytes);
 
-    console.log("Uploading to Cloudinary...");
+    /* =====================================================
+       CONVERT BUFFER TO DATA URI
+    ===================================================== */
 
-    const result: UploadApiResponse = await new Promise(
-      (resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
+    const base64 = buffer.toString("base64");
+
+    const dataUri = `data:${file.type};base64,${base64}`;
+
+    /* =====================================================
+       UPLOAD TO CLOUDINARY
+    ===================================================== */
+
+    const uploadResult = await cloudinary.uploader.upload(
+      dataUri,
+      {
+        folder: "maheen-accessories/hero",
+
+        resource_type: "image",
+
+        transformation: [
           {
-            folder: "maheen-products",
+            quality: "auto",
+            fetch_format: "auto",
           },
-          (error, result) => {
-            if (error) {
-              console.error("Cloudinary Error:", error);
-              reject(error);
-              return;
-            }
-
-            if (!result) {
-              reject(new Error("Cloudinary returned no result."));
-              return;
-            }
-
-            console.log(
-              "Cloudinary Success:",
-              result.secure_url
-            );
-
-            resolve(result);
-          }
-        );
-
-        stream.end(buffer);
+        ],
       }
     );
+
+    /* =====================================================
+       RETURN RESULT
+    ===================================================== */
 
     return NextResponse.json(
       {
         success: true,
-        url: result.secure_url,
+        message: "Image uploaded successfully",
+
+        data: {
+          url: uploadResult.secure_url,
+          publicId: uploadResult.public_id,
+          width: uploadResult.width,
+          height: uploadResult.height,
+          format: uploadResult.format,
+        },
       },
-      {
-        status: 200,
-      }
+      { status: 201 }
     );
   } catch (error) {
-    console.error("UPLOAD ERROR:", error);
+    console.error("CLOUDINARY UPLOAD ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Upload failed.",
+        message: "Failed to upload image",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
