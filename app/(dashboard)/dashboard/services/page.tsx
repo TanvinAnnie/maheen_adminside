@@ -1,13 +1,14 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  ImagePlus,
+  BriefcaseBusiness,
+  Edit,
   Plus,
-  Save,
+  RefreshCw,
+  Search,
   Trash2,
-  Upload,
-  X,
 } from "lucide-react";
 
 type ServiceItem = {
@@ -26,298 +27,135 @@ type ServiceData = {
   description: string;
   items: ServiceItem[];
   isPublished: boolean;
-};
-
-const emptyService: ServiceData = {
-  eyebrow: "01 // SERVICES",
-  title: "Our Core Services",
-  description:
-    "We specialize in developing products that meet world-class standards, ensuring every detail is perfect to bring your vision to life.",
-  items: [],
-  isPublished: true,
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export default function ServicesPage() {
-  const [service, setService] = useState<ServiceData>(emptyService);
+  const [service, setService] = useState<ServiceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploadingIndex, setUploadingIndex] = useState<number | null>(
-    null
-  );
-  const [message, setMessage] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
-  // =====================================================
-  // FETCH SERVICES
-  // =====================================================
-
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await fetch("/api/services", {
-          cache: "no-store",
-        });
-
-        const result = await response.json();
-
-        if (response.status === 404) {
-          setService(emptyService);
-          return;
-        }
-
-        if (!response.ok || !result.success) {
-          throw new Error(
-            result.message || "Failed to fetch services"
-          );
-        }
-
-        setService(result.data);
-      } catch (err) {
-        console.error("Services fetch error:", err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load services"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchServices();
-  }, []);
-
-  // =====================================================
-  // UPDATE BASIC FIELD
-  // =====================================================
-
-  const updateField = (
-    field: keyof ServiceData,
-    value: string | boolean
-  ) => {
-    setService((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-  };
-
-  // =====================================================
-  // ADD SERVICE
-  // =====================================================
-
-  const addService = () => {
-    setService((previous) => {
-      const nextNumber = String(previous.items.length + 1).padStart(
-        2,
-        "0"
-      );
-
-      const newItem: ServiceItem = {
-        number: nextNumber,
-        title: "",
-        image: "",
-        order: previous.items.length + 1,
-        isActive: true,
-      };
-
-      return {
-        ...previous,
-        items: [...previous.items, newItem],
-      };
-    });
-  };
-
-  // =====================================================
-  // UPDATE SERVICE
-  // =====================================================
-
-  const updateItem = (
-    index: number,
-    field: keyof ServiceItem,
-    value: string | number | boolean
-  ) => {
-    setService((previous) => {
-      const updatedItems = [...previous.items];
-
-      updatedItems[index] = {
-        ...updatedItems[index],
-        [field]: value,
-      };
-
-      return {
-        ...previous,
-        items: updatedItems,
-      };
-    });
-  };
-
-  // =====================================================
-  // DELETE SERVICE
-  // =====================================================
-
-  const deleteItem = (index: number) => {
-    setService((previous) => {
-      const updatedItems = previous.items
-        .filter((_, itemIndex) => itemIndex !== index)
-        .map((item, itemIndex) => ({
-          ...item,
-          number: String(itemIndex + 1).padStart(2, "0"),
-          order: itemIndex + 1,
-        }));
-
-      return {
-        ...previous,
-        items: updatedItems,
-      };
-    });
-  };
-
-  // =====================================================
-  // IMAGE UPLOAD
-  // =====================================================
-
-  const handleImageUpload = async (
-    event: ChangeEvent<HTMLInputElement>,
-    index: number
-  ) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
+  const loadServices = useCallback(async () => {
     try {
-      setUploadingIndex(index);
+      setLoading(true);
       setError("");
-      setMessage("");
-
-      const formData = new FormData();
-
-      formData.append("file", file);
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Image upload failed"
-        );
-      }
-
-      const imageUrl =
-        result.url ||
-        result.data?.url ||
-        result.data?.secure_url;
-
-      if (!imageUrl) {
-        throw new Error(
-          "Upload succeeded but no image URL was returned."
-        );
-      }
-
-      updateItem(index, "image", imageUrl);
-
-      setMessage("Image uploaded successfully.");
-    } catch (err) {
-      console.error("Image upload error:", err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Image upload failed"
-      );
-    } finally {
-      setUploadingIndex(null);
-
-      event.target.value = "";
-    }
-  };
-
-  // =====================================================
-  // SAVE
-  // =====================================================
-
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-
-    try {
-      setSaving(true);
-      setError("");
-      setMessage("");
-
-      const payload = {
-        eyebrow: service.eyebrow,
-        title: service.title,
-        description: service.description,
-        items: service.items,
-        isPublished: service.isPublished,
-      };
-
-      const method = service._id ? "PUT" : "POST";
 
       const response = await fetch("/api/services", {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        cache: "no-store",
       });
 
       const result = await response.json();
 
+      if (response.status === 404) {
+        setService(null);
+        return;
+      }
+
       if (!response.ok || !result.success) {
         throw new Error(
-          result.message || "Failed to save services"
+          result.message || "Failed to fetch services"
         );
       }
 
       setService(result.data);
-
-      setMessage(
-        service._id
-          ? "Services updated successfully."
-          : "Services created successfully."
-      );
-    } catch (err) {
-      console.error("Save services error:", err);
+    } catch (error) {
+      console.error("Services fetch error:", error);
 
       setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to save services"
+        error instanceof Error
+          ? error.message
+          : "Failed to load services"
       );
     } finally {
-      setSaving(false);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadServices();
+  }, [loadServices]);
+
+  const handleDelete = async () => {
+    if (!service?._id) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete the Services section?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      setError("");
+
+      const response = await fetch("/api/services", {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to delete services"
+        );
+      }
+
+      setService(null);
+    } catch (error) {
+      console.error("Delete services error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete services"
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
-  // =====================================================
-  // LOADING
-  // =====================================================
+  const filteredItems =
+    service?.items.filter((item) => {
+      const query = search.trim().toLowerCase();
+
+      if (!query) return true;
+
+      return (
+        item.title.toLowerCase().includes(query) ||
+        item.number.toLowerCase().includes(query)
+      );
+    }) ?? [];
+
+  const formatDate = (date?: string) => {
+    if (!date) return "—";
+
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
 
   if (loading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-sm text-gray-500">
-          Loading services...
+      <div className="min-h-[500px] bg-[#f4f7fb] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1450px]">
+          <div className="flex min-h-[400px] items-center justify-center">
+            <div className="text-sm text-gray-500">
+              Loading services...
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // =====================================================
-  // UI
-  // =====================================================
-
   return (
     <div className="min-h-screen bg-[#f4f7fb] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1400px]">
+      <div className="mx-auto max-w-[1450px]">
         {/* HEADER */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -330,474 +168,358 @@ export default function ServicesPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleSubmit as unknown as () => void}
-            disabled={saving}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          <Link
+            href="/dashboard/services/new"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-blue-700"
           >
-            <Save size={17} />
-
-            {saving ? "Saving..." : "Save Services"}
-          </button>
+            <Plus size={17} />
+            Add Service
+          </Link>
         </div>
 
-        {/* MESSAGE */}
-        {message && (
-          <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {message}
-          </div>
-        )}
-
+        {/* ERROR */}
         {error && (
           <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
-            {/* LEFT */}
-            <div className="space-y-6">
-              {/* GENERAL INFORMATION */}
-              <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-                <div className="mb-6">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    General Information
-                  </h2>
+        {/* EMPTY STATE */}
+        {!service ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <BriefcaseBusiness size={26} />
+            </div>
 
-                  <p className="mt-1 text-sm text-gray-500">
-                    Manage the heading and description of the
-                    services section.
-                  </p>
+            <h2 className="mt-5 text-lg font-semibold text-gray-900">
+              No Services Content
+            </h2>
+
+            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
+              Create your homepage Services section with a heading,
+              description, images, and service cards.
+            </p>
+
+            <Link
+              href="/dashboard/services/new"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-blue-700"
+            >
+              <Plus size={17} />
+              Create Services
+            </Link>
+          </div>
+        ) : (
+          <>
+            {/* MAIN TABLE CARD */}
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              {/* SEARCH */}
+              <div className="flex flex-col gap-4 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                <div className="relative w-full sm:max-w-[360px]">
+                  <Search
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) =>
+                      setSearch(event.target.value)
+                    }
+                    placeholder="Search services..."
+                    className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
                 </div>
 
-                <div className="space-y-5">
-                  {/* Eyebrow */}
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Section Label
-                    </label>
+                <span className="text-sm text-gray-500">
+                  Search by service title or number
+                </span>
+              </div>
 
-                    <input
-                      type="text"
-                      value={service.eyebrow}
-                      onChange={(event) =>
-                        updateField(
-                          "eyebrow",
-                          event.target.value
-                        )
-                      }
-                      placeholder="01 // SERVICES"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                  </div>
+              {/* DESKTOP TABLE */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[850px]">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-[#f4f7fb]">
+                      <th className="px-5 py-4 text-left text-xs font-semibold text-gray-700">
+                        Service
+                      </th>
 
-                  {/* Title */}
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Section Title
-                    </label>
+                      <th className="px-5 py-4 text-left text-xs font-semibold text-gray-700">
+                        Number
+                      </th>
 
-                    <input
-                      type="text"
-                      value={service.title}
-                      onChange={(event) =>
-                        updateField(
-                          "title",
-                          event.target.value
-                        )
-                      }
-                      placeholder="Our Core Services"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                  </div>
+                      <th className="px-5 py-4 text-left text-xs font-semibold text-gray-700">
+                        Status
+                      </th>
 
-                  {/* Description */}
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Description
-                    </label>
+                      <th className="px-5 py-4 text-left text-xs font-semibold text-gray-700">
+                        Updated
+                      </th>
 
-                    <textarea
-                      value={service.description}
-                      onChange={(event) =>
-                        updateField(
-                          "description",
-                          event.target.value
-                        )
-                      }
-                      rows={5}
-                      placeholder="Write your services description..."
-                      className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                  </div>
-                </div>
-              </section>
+                      <th className="px-5 py-4 text-right text-xs font-semibold text-gray-700">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
 
-              {/* SERVICES */}
-              <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      Service Items
-                    </h2>
-
-                    <p className="mt-1 text-sm text-gray-500">
-                      Add and manage the services displayed on
-                      your homepage.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={addService}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-600 px-4 py-2.5 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
-                  >
-                    <Plus size={17} />
-                    Add Service
-                  </button>
-                </div>
-
-                {service.items.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-14 text-center">
-                    <ImagePlus
-                      className="mx-auto mb-3 text-gray-400"
-                      size={36}
-                    />
-
-                    <h3 className="font-medium text-gray-700">
-                      No services added
-                    </h3>
-
-                    <p className="mt-1 text-sm text-gray-500">
-                      Click &quot;Add Service&quot; to create your
-                      first service.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-5">
-                    {service.items.map((item, index) => (
-                      <div
-                        key={item._id || index}
-                        className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5"
-                      >
-                        {/* CARD HEADER */}
-                        <div className="mb-5 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-semibold text-white">
-                              {item.number}
-                            </div>
-
-                            <div>
-                              <h3 className="text-sm font-semibold text-gray-900">
-                                Service {item.number}
-                              </h3>
-
-                              <p className="text-xs text-gray-500">
-                                Homepage service card
-                              </p>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              deleteItem(index)
-                            }
-                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
-                            aria-label="Delete service"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[220px_1fr]">
-                          {/* IMAGE */}
-                          <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700">
-                              Service Image
-                            </label>
-
-                            <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white">
-                              {item.image ? (
-                                <>
+                  <tbody>
+                    {filteredItems.length > 0 ? (
+                      filteredItems.map((item) => (
+                        <tr
+                          key={item._id || item.number}
+                          className="border-b border-gray-100 transition hover:bg-gray-50"
+                        >
+                          {/* SERVICE */}
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                                {item.image ? (
                                   <img
                                     src={item.image}
                                     alt={item.title || "Service"}
-                                    className="h-[180px] w-full object-cover"
+                                    className="h-full w-full object-cover"
                                   />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center">
+                                    <BriefcaseBusiness
+                                      size={18}
+                                      className="text-gray-400"
+                                    />
+                                  </div>
+                                )}
+                              </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      updateItem(
-                                        index,
-                                        "image",
-                                        ""
-                                      )
-                                    }
-                                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80"
-                                    aria-label="Remove image"
-                                  >
-                                    <X size={15} />
-                                  </button>
-                                </>
-                              ) : (
-                                <label className="flex h-[180px] cursor-pointer flex-col items-center justify-center text-center">
-                                  <Upload
-                                    size={30}
-                                    className="mb-3 text-gray-400"
-                                  />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-gray-900">
+                                  {item.title || "Untitled Service"}
+                                </p>
 
-                                  <span className="text-sm font-medium text-gray-700">
-                                    {uploadingIndex === index
-                                      ? "Uploading..."
-                                      : "Upload Image"}
-                                  </span>
-
-                                  <span className="mt-1 text-xs text-gray-400">
-                                    PNG, JPG, WEBP
-                                  </span>
-
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    disabled={
-                                      uploadingIndex === index
-                                    }
-                                    onChange={(event) =>
-                                      handleImageUpload(
-                                        event,
-                                        index
-                                      )
-                                    }
-                                  />
-                                </label>
-                              )}
+                                <p className="mt-1 text-xs text-gray-500">
+                                  Homepage service
+                                </p>
+                              </div>
                             </div>
+                          </td>
+
+                          {/* NUMBER */}
+                          <td className="px-5 py-4">
+                            <span className="text-sm font-medium text-blue-600">
+                              {item.number}
+                            </span>
+                          </td>
+
+                          {/* STATUS */}
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                                item.isActive
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {item.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+
+                          {/* UPDATED */}
+                          <td className="px-5 py-4 text-sm text-gray-500">
+                            {formatDate(service.updatedAt)}
+                          </td>
+
+                          {/* ACTIONS */}
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-2">
+                              <Link
+                                href="/dashboard/services/new"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 transition hover:bg-blue-100"
+                                aria-label="Edit services"
+                              >
+                                <Edit size={16} />
+                              </Link>
+
+                              <button
+                                type="button"
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-500 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                aria-label="Delete services"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-5 py-12 text-center"
+                        >
+                          <p className="text-sm font-medium text-gray-700">
+                            No matching services found
+                          </p>
+
+                          <p className="mt-1 text-xs text-gray-500">
+                            Try a different search term.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* MOBILE CARDS */}
+              <div className="divide-y divide-gray-100 md:hidden">
+                {filteredItems.length > 0 ? (
+                  filteredItems.map((item) => (
+                    <div
+                      key={item._id || item.number}
+                      className="p-4"
+                    >
+                      <div className="flex gap-4">
+                        <div className="h-20 w-24 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt={item.title || "Service"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <BriefcaseBusiness
+                                size={20}
+                                className="text-gray-400"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {item.title || "Untitled Service"}
+                              </p>
+
+                              <p className="mt-1 text-xs text-blue-600">
+                                {item.number}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                item.isActive
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {item.isActive
+                                ? "Active"
+                                : "Inactive"}
+                            </span>
                           </div>
 
-                          {/* DETAILS */}
-                          <div className="space-y-5">
-                            {/* Number */}
-                            <div>
-                              <label className="mb-2 block text-sm font-medium text-gray-700">
-                                Number
-                              </label>
+                          <div className="mt-4 flex items-center justify-between">
+                            <span className="text-xs text-gray-500">
+                              Updated{" "}
+                              {formatDate(service.updatedAt)}
+                            </span>
 
-                              <input
-                                type="text"
-                                value={item.number}
-                                onChange={(event) =>
-                                  updateItem(
-                                    index,
-                                    "number",
-                                    event.target.value
-                                  )
-                                }
-                                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                              />
-                            </div>
+                            <div className="flex gap-2">
+                              <Link
+                                href="/dashboard/services/new"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600"
+                                aria-label="Edit services"
+                              >
+                                <Edit size={15} />
+                              </Link>
 
-                            {/* Title */}
-                            <div>
-                              <label className="mb-2 block text-sm font-medium text-gray-700">
-                                Service Title
-                              </label>
-
-                              <input
-                                type="text"
-                                value={item.title}
-                                onChange={(event) =>
-                                  updateItem(
-                                    index,
-                                    "title",
-                                    event.target.value
-                                  )
-                                }
-                                placeholder="Button Manufacturing"
-                                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                              />
-                            </div>
-
-                            {/* Order + Active */}
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                              <div>
-                                <label className="mb-2 block text-sm font-medium text-gray-700">
-                                  Order
-                                </label>
-
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={item.order}
-                                  onChange={(event) =>
-                                    updateItem(
-                                      index,
-                                      "order",
-                                      Number(
-                                        event.target.value
-                                      )
-                                    )
-                                  }
-                                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                                />
-                              </div>
-
-                              <div className="flex items-end">
-                                <label className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3">
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-700">
-                                      Active
-                                    </p>
-
-                                    <p className="text-xs text-gray-400">
-                                      Show on website
-                                    </p>
-                                  </div>
-
-                                  <input
-                                    type="checkbox"
-                                    checked={item.isActive}
-                                    onChange={(event) =>
-                                      updateItem(
-                                        index,
-                                        "isActive",
-                                        event.target.checked
-                                      )
-                                    }
-                                    className="h-5 w-5 accent-blue-600"
-                                  />
-                                </label>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-500 disabled:opacity-50"
+                                aria-label="Delete services"
+                              >
+                                <Trash2 size={15} />
+                              </button>
                             </div>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-5 py-12 text-center">
+                    <p className="text-sm font-medium text-gray-700">
+                      No matching services found
+                    </p>
 
-              {/* PUBLISH */}
-              <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-                <div className="flex items-center justify-between gap-5">
-                  <div>
-                    <h2 className="text-base font-semibold text-gray-900">
-                      Publish Services
-                    </h2>
-
-                    <p className="mt-1 text-sm text-gray-500">
-                      Control whether this section is visible on
-                      the client website.
+                    <p className="mt-1 text-xs text-gray-500">
+                      Try a different search term.
                     </p>
                   </div>
+                )}
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateField(
-                        "isPublished",
-                        !service.isPublished
-                      )
-                    }
-                    className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                      service.isPublished
-                        ? "bg-green-500"
-                        : "bg-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${
-                        service.isPublished
-                          ? "left-6"
-                          : "left-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-              </section>
+              {/* FOOTER */}
+              <div className="flex flex-col gap-4 border-t border-gray-200 bg-[#f8fafc] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-gray-500">
+                  Showing{" "}
+                  <span className="font-medium text-blue-600">
+                    {filteredItems.length}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-medium text-blue-600">
+                    {service.items.length}
+                  </span>{" "}
+                  services
+                </p>
 
-              {/* SAVE BUTTON */}
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Save size={18} />
-
-                {saving ? "Saving Services..." : "Save Services"}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => void loadServices()}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <RefreshCw size={16} />
+                  Refresh
+                </button>
+              </div>
             </div>
 
-            {/* RIGHT — LIVE PREVIEW */}
-            <div className="xl:sticky xl:top-6 xl:self-start">
-              <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-200 px-5 py-5">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Live Preview
+            {/* SECTION STATUS */}
+            <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">
+                    Services Section Status
                   </h2>
 
-                  <p className="mt-1 text-sm text-blue-600">
-                    Preview how this section will appear.
+                  <p className="mt-1 text-sm text-gray-500">
+                    Control whether the complete Services section
+                    appears on the client website.
                   </p>
                 </div>
 
-                <div className="bg-white p-6">
-                  <p className="text-[10px] font-medium tracking-[2px] text-[#7890dc]">
-                    {service.eyebrow}
-                  </p>
-
-                  <h3 className="mt-3 whitespace-pre-line text-3xl font-light leading-tight text-black">
-                    {service.title}
-                  </h3>
-
-                  <p className="mt-6 text-sm leading-6 text-gray-500">
-                    {service.description}
-                  </p>
-
-                  <div className="mt-8 space-y-4">
-                    {service.items
-                      .filter((item) => item.isActive)
-                      .map((item) => (
-                        <div
-                          key={item._id || item.number}
-                          className="group relative overflow-hidden rounded-2xl"
-                        >
-                          {item.image ? (
-                            <img
-                              src={item.image}
-                              alt={item.title}
-                              className="h-[170px] w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-[170px] items-center justify-center bg-gray-100">
-                              <ImagePlus className="text-gray-400" />
-                            </div>
-                          )}
-
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
-                          <div className="absolute bottom-4 left-4 right-4">
-                            <p className="text-2xl font-semibold text-white">
-                              {item.number}
-                            </p>
-
-                            <p className="mt-1 text-sm font-medium text-white">
-                              {item.title ||
-                                "Service Title"}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </section>
+                <span
+                  className={`inline-flex w-fit rounded-full px-4 py-2 text-xs font-semibold ${
+                    service.isPublished
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {service.isPublished
+                    ? "Published"
+                    : "Unpublished"}
+                </span>
+              </div>
             </div>
-          </div>
-        </form>
+          </>
+        )}
       </div>
     </div>
   );

@@ -33,6 +33,11 @@ const menus: { title: string; href: string; icon: IconComponent }[] = [
   href: "/dashboard/services",
   icon: BriefcaseBusiness,
 },
+{
+  title: "Photo Albums",
+  href: "/dashboard/photo-albums",
+  icon: Image,
+},
   {
     title: "Products",
     href: "/products",
