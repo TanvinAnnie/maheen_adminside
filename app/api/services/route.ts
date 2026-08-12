@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {connectToDB} from "@/lib/connectToDB";
+import { connectToDB } from "@/lib/connectToDB";
 import Service from "@/lib/models/Service";
 
 // ======================================================
@@ -65,11 +65,42 @@ export async function POST(request: NextRequest) {
       isPublished,
     } = body;
 
-    if (!eyebrow || !title || !description) {
+    if (
+      typeof eyebrow !== "string" ||
+      !eyebrow.trim()
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Eyebrow, title and description are required",
+          message: "Eyebrow is required",
+          data: null,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Title is required",
+          data: null,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof description !== "string" ||
+      !description.trim()
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Description is required",
           data: null,
         },
         { status: 400 }
@@ -102,12 +133,14 @@ export async function POST(request: NextRequest) {
     }
 
     const service = await Service.create({
-      eyebrow,
-      title,
-      description,
+      eyebrow: eyebrow.trim(),
+      title: title.trim(),
+      description: description.trim(),
       items,
       isPublished:
-        typeof isPublished === "boolean" ? isPublished : true,
+        typeof isPublished === "boolean"
+          ? isPublished
+          : true,
     });
 
     return NextResponse.json(
@@ -121,10 +154,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("POST /api/services error:", error);
 
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unknown database error";
+
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to create services",
+        message: `Failed to create services: ${errorMessage}`,
         data: null,
       },
       { status: 500 }
@@ -142,6 +180,11 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
+    console.log(
+      "🔵 PUT /api/services body:",
+      JSON.stringify(body, null, 2)
+    );
+
     const {
       eyebrow,
       title,
@@ -149,6 +192,10 @@ export async function PUT(request: NextRequest) {
       items,
       isPublished,
     } = body;
+
+    // --------------------------------------------------
+    // Find existing document
+    // --------------------------------------------------
 
     const service = await Service.findOne();
 
@@ -163,17 +210,75 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // --------------------------------------------------
+    // Validate fields
+    // --------------------------------------------------
+
+    if (
+      eyebrow !== undefined &&
+      (typeof eyebrow !== "string" ||
+        !eyebrow.trim())
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Eyebrow must be a non-empty string",
+          data: null,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      title !== undefined &&
+      (typeof title !== "string" ||
+        !title.trim())
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Title must be a non-empty string",
+          data: null,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      description !== undefined &&
+      (typeof description !== "string" ||
+        !description.trim())
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Description must be a non-empty string",
+          data: null,
+        },
+        { status: 400 }
+      );
+    }
+
+    // --------------------------------------------------
+    // Update basic fields
+    // --------------------------------------------------
+
     if (eyebrow !== undefined) {
-      service.eyebrow = eyebrow;
+      service.eyebrow = eyebrow.trim();
     }
 
     if (title !== undefined) {
-      service.title = title;
+      service.title = title.trim();
     }
 
     if (description !== undefined) {
-      service.description = description;
+      service.description = description.trim();
     }
+
+    // --------------------------------------------------
+    // Update items
+    // --------------------------------------------------
 
     if (items !== undefined) {
       if (!Array.isArray(items)) {
@@ -187,14 +292,75 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      service.items = items;
+      /*
+       * Normalize the items before assigning them
+       * to Mongoose.
+       *
+       * This prevents unnecessary/invalid properties
+       * from being sent to the schema.
+       */
+
+      const normalizedItems = items.map(
+        (
+          item: Record<string, unknown>,
+          index: number
+        ) => ({
+          ...(typeof item._id === "string"
+            ? { _id: item._id }
+            : {}),
+
+          number:
+            typeof item.number === "string"
+              ? item.number
+              : String(index + 1).padStart(2, "0"),
+
+          title:
+            typeof item.title === "string"
+              ? item.title.trim()
+              : "",
+
+          image:
+            typeof item.image === "string"
+              ? item.image
+              : "",
+
+          order:
+            typeof item.order === "number"
+              ? item.order
+              : index + 1,
+
+          isActive:
+            typeof item.isActive === "boolean"
+              ? item.isActive
+              : true,
+        })
+      );
+
+      service.items = normalizedItems;
     }
+
+    // --------------------------------------------------
+    // Update publish status
+    // --------------------------------------------------
 
     if (typeof isPublished === "boolean") {
       service.isPublished = isPublished;
     }
 
+    // --------------------------------------------------
+    // Save MongoDB document
+    // --------------------------------------------------
+
+    console.log(
+      "🟡 Saving Services document..."
+    );
+
     await service.save();
+
+    console.log(
+      "🟢 Services updated successfully:",
+      (service._id as any).toString()
+    );
 
     return NextResponse.json(
       {
@@ -205,12 +371,26 @@ export async function PUT(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("PUT /api/services error:", error);
+    console.error(
+      "❌ PUT /api/services error:",
+      error
+    );
+
+    /*
+     * Return the ACTUAL error message during development.
+     * This will tell us immediately if the problem is
+     * Mongoose validation, casting, duplicate data, etc.
+     */
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unknown database error";
 
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to update services",
+        message: `Failed to update services: ${errorMessage}`,
         data: null,
       },
       { status: 500 }
@@ -226,7 +406,8 @@ export async function DELETE() {
   try {
     await connectToDB();
 
-    const service = await Service.findOneAndDelete();
+    const service =
+      await Service.findOneAndDelete();
 
     if (!service) {
       return NextResponse.json(
@@ -248,12 +429,20 @@ export async function DELETE() {
       { status: 200 }
     );
   } catch (error) {
-    console.error("DELETE /api/services error:", error);
+    console.error(
+      "DELETE /api/services error:",
+      error
+    );
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unknown database error";
 
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to delete services",
+        message: `Failed to delete services: ${errorMessage}`,
         data: null,
       },
       { status: 500 }
